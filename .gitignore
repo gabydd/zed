@@ -25,3 +25,5 @@ DerivedData/
 **/*.db
 .pytest_cache
 .venv
+.direnv
+.envrc

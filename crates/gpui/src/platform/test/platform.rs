@@ -118,7 +118,7 @@ impl Platform for TestPlatform {
     }
 
     fn text_system(&self) -> Arc<dyn PlatformTextSystem> {
-        Arc::new(crate::platform::mac::MacTextSystem::new())
+        Arc::new(crate::platform::linux::LinuxTextSystem::new())
     }
 
     fn run(&self, _on_finish_launching: Box<dyn FnOnce()>) {

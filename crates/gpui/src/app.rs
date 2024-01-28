@@ -482,6 +482,7 @@ impl AppContext {
             let mut window = Window::new(handle.into(), options, cx);
             let root_view = build_root_view(&mut WindowContext::new(cx, &mut window));
             window.root_view.replace(root_view.into());
+            window.dirty = true;
             cx.windows.get_mut(id).unwrap().replace(window);
             handle
         })
