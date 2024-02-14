@@ -3,8 +3,8 @@ use crate::platform::linux::wayland::display::WaylandDisplay;
 use crate::platform::{PlatformAtlas, PlatformInputHandler, PlatformWindow};
 use crate::scene::Scene;
 use crate::{
-    px, Bounds, Modifiers, Pixels, PlatformDisplay, PlatformInput, Point, PromptLevel, Size,
-    WindowAppearance, WindowBounds, WindowOptions,
+    px, Bounds, KeyDownEvent, Modifiers, Pixels, PlatformDisplay, PlatformInput, Point,
+    PromptLevel, Size, WindowAppearance, WindowBounds, WindowOptions,
 };
 use blade_graphics as gpu;
 use blade_rwh::{HasRawDisplayHandle, HasRawWindowHandle, RawDisplayHandle, RawWindowHandle};
@@ -32,6 +32,7 @@ struct Callbacks {
     should_close: Option<Box<dyn FnMut() -> bool>>,
     close: Option<Box<dyn FnOnce()>>,
     appearance_changed: Option<Box<dyn FnMut()>>,
+    input_handler: Option<PlatformInputHandler>,
 }
 
 struct WaylandWindowInner {
@@ -137,8 +138,10 @@ impl WaylandWindowState {
 
     pub fn update(&self) {
         let mut cb = self.callbacks.lock();
-        if let Some(ref mut fun) = cb.request_frame {
+        if let Some(mut fun) = cb.request_frame.take() {
+            drop(cb);
             fun();
+            self.callbacks.lock().request_frame = Some(fun);
         }
     }
 
@@ -165,6 +168,36 @@ impl WaylandWindowState {
         }
         if let Some(ref mut fun) = callbacks.moved {
             fun()
+        }
+    }
+    pub(crate) fn handle_event(&self, event: PlatformInput) {
+        let mut lock = self.callbacks.lock();
+        if let Some(mut input) = lock.input.take() {
+            drop(lock);
+            let handled = input(event.clone());
+            self.callbacks.lock().input = Some(input);
+        }
+    }
+
+    pub(crate) fn handle_key(&self, event: KeyDownEvent, key: &str) {
+        let mut lock = self.callbacks.lock();
+        if let Some(mut input) = lock.input.take() {
+            drop(lock);
+            let handled = input(PlatformInput::KeyDown(event.clone()));
+            if !handled {
+                let mut lock = self.callbacks.lock();
+                if let Some(mut input_handler) = lock.input_handler.take() {
+                    drop(lock);
+                    let key = if event.keystroke.key == "space" {
+                        " "
+                    } else {
+                        key
+                    };
+                    input_handler.replace_text_in_range(None, key);
+                    self.callbacks.lock().input_handler = Some(input_handler);
+                }
+            }
+            self.callbacks.lock().input = Some(input);
         }
     }
 }
@@ -235,12 +268,12 @@ impl PlatformWindow for WaylandWindow {
     }
 
     fn set_input_handler(&mut self, input_handler: PlatformInputHandler) {
-        //todo!(linux)
+        self.0.callbacks.lock().input_handler = Some(input_handler);
     }
 
     //todo!(linux)
     fn take_input_handler(&mut self) -> Option<PlatformInputHandler> {
-        None
+        self.0.callbacks.lock().input_handler.take()
     }
 
     //todo!(linux)
@@ -289,7 +322,7 @@ impl PlatformWindow for WaylandWindow {
     }
 
     fn on_input(&self, callback: Box<dyn FnMut(PlatformInput) -> bool>) {
-        //todo!(linux)
+        self.0.callbacks.lock().input = Some(callback);
     }
 
     fn on_active_status_change(&self, callback: Box<dyn FnMut(bool)>) {
