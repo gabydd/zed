@@ -78,15 +78,8 @@ impl X11Client {
         inner
             .loop_handle
             .insert_source(
-                Generic::new_with_error::<xcb::Error>(
-                    fd,
-                    calloop::Interest::READ,
-                    calloop::Mode::Level,
-                ),
-                {
-                    let client = Rc::clone(&client);
-                    move |readiness, _, _| Ok(calloop::PostAction::Continue)
-                },
+                Generic::new(fd, calloop::Interest::READ, calloop::Mode::Level),
+                |_, _, _| Ok(calloop::PostAction::Continue),
             )
             .unwrap();
 
@@ -99,7 +92,6 @@ impl X11Client {
     }
 
     fn handle_event(&self, event: xcb::Event) {
-        println!("event {:?}", event);
         match event {
             xcb::Event::X(x::Event::ClientMessage(ev)) => {
                 if let x::ClientMessageData::Data32([atom, ..]) = ev.data() {
@@ -132,7 +124,6 @@ impl X11Client {
                 self.get_window(ev.window()).configure(bounds)
             }
             xcb::Event::Present(xcb::present::Event::CompleteNotify(ev)) => {
-                println!("refresh: {:?}", ev.window());
                 self.state.lock().windows_to_refresh.insert(ev.window());
             }
             xcb::Event::Present(xcb::present::Event::IdleNotify(_ev)) => {}
