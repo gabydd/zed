@@ -329,6 +329,7 @@ impl X11WindowState {
             divisor: 1,
             remainder: 0,
         });
+        self.xcb_connection.flush();
     }
 
     pub fn handle_input(&self, input: PlatformInput) {
