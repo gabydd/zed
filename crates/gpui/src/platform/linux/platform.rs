@@ -72,14 +72,7 @@ impl LinuxPlatform {
         let callbacks = Mutex::new(Callbacks::default());
 
         let event_loop = EventLoop::try_new().unwrap();
-        event_loop
-            .handle()
-            .insert_source(main_receiver, |event, _, _| match event {
-                calloop::channel::Event::Msg(runnable) => {
-                    runnable.run();
-                }
-                calloop::channel::Event::Closed => {}
-            });
+        let loop_handle = event_loop.handle();
 
         let dispatcher = Arc::new(LinuxDispatcher::new(main_sender));
 
@@ -93,7 +86,7 @@ impl LinuxPlatform {
             callbacks,
         });
 
-        if use_wayland {
+        let this = if use_wayland {
             Self {
                 client: Rc::new(WaylandClient::new(Rc::clone(&inner))),
                 inner,
@@ -103,7 +96,18 @@ impl LinuxPlatform {
                 client: X11Client::new(Rc::clone(&inner)),
                 inner,
             }
-        }
+        };
+
+        let client = Rc::clone(&this.client);
+        loop_handle.insert_source(main_receiver, move |event, _, _| match event {
+            calloop::channel::Event::Msg(runnable) => {
+                runnable.run();
+                client.event_loop_will_wait();
+            }
+            calloop::channel::Event::Closed => {}
+        });
+
+        this
     }
 }
 
