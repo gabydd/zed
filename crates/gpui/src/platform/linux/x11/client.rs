@@ -1,6 +1,6 @@
 use std::{rc::Rc, sync::Arc};
 
-use parking_lot::{Mutex, MutexGuard};
+use parking_lot::Mutex;
 use xcb::{x, Xid as _};
 use xkbcommon::xkb;
 
@@ -85,28 +85,7 @@ impl X11Client {
                 ),
                 {
                     let client = Rc::clone(&client);
-                    move |readiness, _, _| {
-                        // if readiness.readable {
-                        println!("ready");
-                        loop {
-                            if let Some(event) = client.xcb_connection.poll_for_event().unwrap() {
-                                client.handle_event(event)
-                            } else if let Some(x_window) = {
-                                let lock = client.state.lock();
-                                let window = lock.windows_to_refresh.iter().next().cloned();
-                                drop(lock);
-                                window
-                            } {
-                                client.state.lock().windows_to_refresh.remove(&x_window);
-                                let window = client.get_window(x_window);
-                                window.refresh();
-                                window.request_refresh();
-                            } else {
-                                profiling::scope!("Wait for event");
-                                return Ok(calloop::PostAction::Continue);
-                            };
-                        }
-                    }
+                    move |readiness, _, _| Ok(calloop::PostAction::Continue)
                 },
             )
             .unwrap();

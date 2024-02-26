@@ -102,7 +102,6 @@ impl LinuxPlatform {
         loop_handle.insert_source(main_receiver, move |event, _, _| match event {
             calloop::channel::Event::Msg(runnable) => {
                 runnable.run();
-                client.event_loop_will_wait();
             }
             calloop::channel::Event::Closed => {}
         });
