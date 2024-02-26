@@ -248,7 +248,6 @@ impl Client for X11Client {
                 window.refresh();
                 window.request_refresh();
             } else {
-                profiling::scope!("Wait for event");
                 return;
             };
         }
